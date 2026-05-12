@@ -60,9 +60,11 @@ if __name__ == "__main__":
     # 3. Get input and output details (get_input_details(), get_output_details()).
     # ---------------------------------------------------------
     # interpreter = ...
-    
-    input_details = [{'index': 0}]   # Placeholder, remove this
-    output_details = [{'index': 0}]  # Placeholder, remove this
+    interpreter = tflite.Interpreter(model_path=model_path)
+    interpreter.allocate_tensors()
+
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
     
     print(f"[*] Model Loaded: {model_path}")
 
@@ -85,8 +87,21 @@ if __name__ == "__main__":
     # DO NOT cast to float32. Keep the data type as uint8!
     # ---------------------------------------------------------
     # input_data = ...
-    
-    input_data = np.zeros((1, 224, 224, 3), dtype=np.uint8) # Placeholder
+    # Resize image to 224x224
+    image_resized = cv2.resize(
+        image,
+        (224, 224),
+        interpolation=cv2.INTER_LINEAR
+    )
+
+    # BGR -> RGB using zero-copy slicing
+    image_rgb = image_resized[:, :, ::-1]
+
+    # Add batch dimension: (1, 224, 224, 3)
+    input_data = np.expand_dims(image_rgb, axis=0)
+
+    # Keep as uint8 for INT8 quantized model
+    input_data = input_data.astype(np.uint8)
     
     t_pre = (time.perf_counter() - t0) * 1000
 
@@ -104,8 +119,19 @@ if __name__ == "__main__":
     # interpreter.set_tensor(input_details[0]['index'], input_data)
     # ...
     # output_data = ...
-    
-    output_data = np.zeros((1, 1001)) # Placeholder
+    # Set input tensor
+    interpreter.set_tensor(
+        input_details[0]['index'],
+        input_data
+    )   
+
+    # Run inference
+    interpreter.invoke()
+
+    # Get output tensor
+    output_data = interpreter.get_tensor(
+        output_details[0]['index']
+    )
     
     t_inf = (time.perf_counter() - t1) * 1000
     
